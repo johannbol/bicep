@@ -1,9 +1,7 @@
 param adminUserName string
 
 @secure()
-param adminPassword string {
-  secure: true
-}
+param adminPassword string
 
 param dnsLabelPrefix string
 
@@ -36,7 +34,6 @@ var virtualNetworkName = 'Q901-WE-vnet'
 var subnetRef = '${vn.id}/subnets/${subnetName}'
 var networkSecurityGroupName = 'default-NSG'
 
-
 resource stg 'Microsoft.Storage/storageAccounts@2019-06-01' = {
   name: storageAccountName
   location: location
@@ -50,7 +47,6 @@ resource vn 'Microsoft.Network/virtualNetworks@2020-06-01' existing = {
   name: virtualNetworkName
   scope: resourceGroup('Q901-WE-network') 
 }
-
 resource nsg 'Microsoft.Network/networkSecurityGroups@2020-06-01' = {
   name: 'myNSG'
   location: location

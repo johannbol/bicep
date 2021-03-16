@@ -1,0 +1,177 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "adminUserName": {
+      "type": "string"
+    },
+    "adminPassword": {
+      "type": "secureString"
+    },
+    "dnsLabelPrefix": {
+      "type": "string"
+    },
+    "windowsOSVersion": {
+      "type": "array",
+      "defaultValue": [
+        "20h2-ent",
+        "20h2-ent-g2",
+        "20h2-entn",
+        "20h2-entn-g2"
+      ],
+      "metadata": {
+        "description": "The Windows version for the VM. This will pick a fully patched image of this given Windows version."
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "defaultValue": "Standard_DS1_v2",
+      "metadata": {
+        "description": "Size of the virtual machine."
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "location for all resources"
+      }
+    }
+  },
+  "functions": [],
+  "variables": {
+    "storageAccountName": "[concat(uniqueString(resourceGroup().id), 'sawinvm')]",
+    "nicName": "myVMNic",
+    "subnetName": "Q901-WE-subnet",
+    "vmName": "SimpleWinVM",
+    "virtualNetworkName": "Q901-WE-vnet",
+    "subnetRef": "[format('{0}/subnets/{1}', extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, 'Q901-WE-network'), 'Microsoft.Network/virtualNetworks', variables('virtualNetworkName')), variables('subnetName'))]",
+    "networkSecurityGroupName": "default-NSG"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2019-06-01",
+      "name": "[variables('storageAccountName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "Storage"
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2020-06-01",
+      "name": "myNSG",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "MySecurityRule",
+            "properties": {
+              "priority": 1000,
+              "protocol": "Tcp",
+              "direction": "Inbound",
+              "sourcePortRange": "22",
+              "destinationPortRange": "22",
+              "access": "Deny",
+              "sourceAddressPrefix": "10.0.0.0/28",
+              "destinationAddressPrefix": "10.0.0.0/28"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "copy": {
+        "name": "nInter",
+        "count": "[length(range(0, length(parameters('windowsOSVersion'))))]"
+      },
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2020-06-01",
+      "name": "[format('{0}{1}', variables('nicName'), range(0, length(parameters('windowsOSVersion')))[copyIndex()])]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "[format('ipconfig{0}', range(0, length(parameters('windowsOSVersion')))[copyIndex()])]",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('subnetRef')]"
+              }
+            }
+          }
+        ],
+        "networkSecurityGroup": {
+          "id": "[resourceId('Microsoft.Network/networkSecurityGroups', 'myNSG')]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', 'myNSG')]"
+      ]
+    },
+    {
+      "copy": {
+        "name": "VM",
+        "count": "[length(range(0, length(parameters('windowsOSVersion'))))]"
+      },
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2020-06-01",
+      "name": "[format('{0}-{1}', variables('vmName'), parameters('windowsOSVersion')[range(0, length(parameters('windowsOSVersion')))[copyIndex()]])]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('vmSize')]"
+        },
+        "osProfile": {
+          "computerName": "[variables('vmName')]",
+          "adminUsername": "[parameters('adminUserName')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "MicrosoftWindowsDesktop",
+            "offer": "Windows-10",
+            "sku": "[parameters('windowsOSVersion')[range(0, length(parameters('windowsOSVersion')))[copyIndex()]]]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "createOption": "FromImage"
+          },
+          "dataDisks": [
+            {
+              "diskSizeGB": 1023,
+              "lun": 0,
+              "createOption": "Empty"
+            }
+          ]
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', format('{0}{1}', variables('nicName'), range(0, length(parameters('windowsOSVersion')))[range(0, length(parameters('windowsOSVersion')))[copyIndex()]]))]"
+            }
+          ]
+        },
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": true,
+            "storageUri": "[reference(resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))).primaryEndpoints.blob]"
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkInterfaces', format('{0}{1}', variables('nicName'), range(0, length(parameters('windowsOSVersion')))[range(0, length(parameters('windowsOSVersion')))[copyIndex()]]))]",
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]"
+      ]
+    }
+  ],
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.3.1.62928",
+      "templateHash": "8023529796601610870"
+    }
+  }
+}

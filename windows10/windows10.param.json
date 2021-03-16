@@ -3,18 +3,20 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "adminUserName": {
-            "value": "myName"
+            "value": "myUserName"
         },
         "adminPassword": {
-            "value": "mySecretPassword"
+            "value": "My#Super!Secret1Password%123"
         },
         "dnsLabelPrefix": {
             "value": "myDNS"
         },
+        "offer": {
+            "value": "office-365"
+        },
         "windowsOSVersion": {
             "value": [
-                "20h2-ent",
-                "20h2-ent-g2"
+                "19h2-evd-o365pp"
             ]
         },
         "vmSize": {
